@@ -212,10 +212,6 @@ export default function App() {
     const [gameEvents, setGameEvents] = useState<any[]>([]);
     const [completedModals, setCompletedModals] = useState<string[]>([]);
 
-    const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
-    const [finalWinner, setFinalWinner] = useState<any>(null);
-    const [hideVictoryOverlay, setHideVictoryOverlay] = useState(true);
-
     // Election Night States
     const [electionNews, setElectionNews] = useState<NewsEvent[]>([]);
     const [calledRegions, setCalledRegions] = useState<string[]>([]);
@@ -264,8 +260,6 @@ export default function App() {
         setCalledRegions([]);
         setElectionNews([]);
         setElectionFinished(false);
-        setHideVictoryOverlay(false);
-        setFinalWinner(null);
         setAp(3);
         setTurn(1);
         const shuffledEvents = [...ALL_EVENTS].sort(() => 0.5 - Math.random());
@@ -315,7 +309,6 @@ export default function App() {
         }
         const id = feature.properties.COUNTYCODE || feature.properties.COUNTYNAME;
         setSelectedRegionId(id);
-        setMobileMenuOpen(true);
     };
 
     // ACTION MECHANICS (Player)
@@ -517,9 +510,6 @@ export default function App() {
         const uncalled = TAIWAN_REGIONS.filter(r => !calledRegions.includes(r.id));
         if (uncalled.length === 0) {
             setElectionFinished(true);
-            const leader = getNationalLeader(pollingData);
-            const winnerParty = PARTIES.find(p => p.id === leader);
-            setFinalWinner(winnerParty || null);
             return;
         }
 
@@ -610,69 +600,99 @@ export default function App() {
 
     return (
         <div className="h-[100dvh] w-full flex flex-col pt-1 relative overflow-hidden bg-[#0a0e1a] text-slate-200">
-            {/* Header / Top Info Bar */}
+            {/* Header / Top Info Bar - Classic Vercel Style */}
             {!isElection && (
-                <header className="flex justify-between items-center px-3 md:px-4 py-2 md:py-3 bg-[#111827]/40 border-b border-white/5 backdrop-blur-md z-30 shrink-0">
-                    <div className="flex flex-col">
-                        <h1 className="text-base md:text-xl font-black tracking-tighter text-white flex items-center gap-2">
-                            TAIWAN <span className="text-blue-500">POLITICAL MACHINE</span>
-                        </h1>
-                        <div className="hidden md:flex items-center gap-2 text-[10px] font-bold text-slate-500 uppercase tracking-widest">
-                            第 {turn}/{MAX_TURNS} 週 <span className="text-emerald-500/80 bg-emerald-500/10 px-1 rounded">【選戰】</span>
+                <header className="flex justify-between items-center px-6 py-4 bg-[#0f172a] border-b border-white/5 z-30 shrink-0">
+                    <div className="flex flex-col gap-1">
+                        <div className="flex items-center gap-3">
+                            <h1 className="text-xl font-black tracking-widest text-[#f8fafc]">
+                                TAIWAN <span className="text-[#3b82f6]">POLITICAL MACHINE</span>
+                            </h1>
+                            <div className="h-4 w-[1px] bg-white/10 mx-1" />
+                            <div className="text-xs font-bold text-slate-400 uppercase tracking-widest bg-slate-800/50 px-2 py-1 rounded">
+                                第 {turn}/{MAX_TURNS} 週 <span className={playerParty?.highlight}>【{playerParty?.name}】</span>
+                            </div>
                         </div>
                     </div>
                     
-                    <div className="flex items-center gap-4 md:gap-8 pr-2">
+                    <div className="flex items-center gap-10 pr-4">
+                        <div className="flex flex-col items-end group">
+                            <span className="text-[10px] font-black text-slate-500 uppercase tracking-[0.2em] mb-1">可用預算資金</span>
+                            <span className="text-2xl font-black text-[#4ade80] font-mono tracking-tight group-hover:scale-105 transition-transform">
+                                ${(partyFunds[playerParty?.id] || 0).toLocaleString()}
+                            </span>
+                        </div>
                         <div className="flex flex-col items-end">
-                            <span className="text-lg md:text-2xl font-black text-emerald-400 font-mono tracking-tight">${(partyFunds[playerParty?.id] || 0).toLocaleString()}</span>
-                            <div className="flex items-center gap-2 mt-0.5">
-                                <span className="text-[10px] text-yellow-500/60 font-bold uppercase tracking-widest">AP: {ap}</span>
-                                <div className="flex gap-1">
-                                    {[...Array(3)].map((_, i) => (
-                                        <div key={i} className={`w-3 h-3 rounded-full border border-yellow-500/30 ${i < ap ? 'bg-yellow-500 shadow-[0_0_8px_rgba(234,179,8,0.5)]' : 'bg-slate-800'}`} />
-                                    ))}
-                                </div>
+                            <span className="text-[10px] font-black text-slate-500 uppercase tracking-[0.2em] mb-1.5">剩餘行動點數 (AP)</span>
+                            <div className="flex gap-2.5">
+                                {[...Array(3)].map((_, i) => (
+                                    <div 
+                                        key={i} 
+                                        className={`w-3.5 h-3.5 rounded-full border-2 transition-all duration-500 ${
+                                            i < ap 
+                                            ? 'bg-[#facd15] border-[#facd15] shadow-[0_0_12px_rgba(250,205,21,0.5)]' 
+                                            : 'bg-slate-800 border-slate-700'
+                                        }`} 
+                                    />
+                                ))}
                             </div>
                         </div>
                     </div>
                 </header>
             )}
 
+            {/* Election Night Header - Classic Dark Style */}
             {isElection && (
-                <header className="mx-4 mt-2 mb-4 rounded-xl px-6 py-3 flex justify-between items-center bg-[#F2F0E9] shadow-sm border border-[#DFDCD5] shrink-0 z-50">
-                    <div>
-                        <h1 className="text-xl font-bold tracking-wider text-[#555C63]">TAIWAN ELECTION <span className="text-[#89939B]">2024</span></h1>
-                        <p className="text-xs font-mono mt-0.5 text-[#969C9F]">決戰時刻 · 全國報票中心</p>
+                <header className="flex justify-between items-center px-8 py-5 bg-[#0f172a] border-b-2 border-indigo-500/30 z-30 shrink-0 shadow-[0_4px_20px_rgba(0,0,0,0.4)]">
+                    <div className="flex items-center gap-4">
+                        <div className="w-3 h-3 rounded-full bg-red-500 animate-pulse shadow-[0_0_12px_rgba(239,68,68,0.5)]" />
+                        <div>
+                            <h1 className="text-2xl font-black text-white italic tracking-tighter uppercase leading-none">Taiwan Decision <span className="text-indigo-400">2024</span></h1>
+                            <div className="text-[10px] font-black text-slate-500 uppercase tracking-[0.3em] mt-1.5 flex items-center gap-2">
+                                <span className="text-red-500/80">● LIVE</span> 全國開票中心 · 即時開票數據
+                            </div>
+                        </div>
                     </div>
                 </header>
             )}
 
             <main className="flex-1 min-h-0 flex flex-row gap-0 overflow-hidden relative">
-                {/* Left Sidebar: Stats, News, End Turn — hidden on mobile */}
-                <div className="hidden md:flex w-80 flex-col shrink-0 bg-[#0f172a]/60 border-r border-white/5 p-4 overflow-hidden z-20">
+                {/* Left Sidebar: Stats, News, End Turn — Classic Dashboard Style */}
+                <div className="hidden md:flex w-80 flex-col shrink-0 bg-[#0f172a] border-r border-white/5 p-5 overflow-hidden z-20">
                     <div className="flex flex-col h-full">
                         {/* Stats Panel */}
-                        <div className="bg-slate-900/60 rounded-xl border border-white/5 p-4 mb-4">
-                            <h2 className="text-xs font-black text-slate-500 uppercase tracking-widest mb-4 flex items-center gap-2">
-                                <div className="w-1.5 h-1.5 bg-blue-500 rounded-full animate-pulse" /> 全國選情預測
+                        <div className="bg-[#1e293b]/40 rounded-2xl border border-white/5 p-5 mb-6">
+                            <h2 className="text-sm font-black text-white uppercase tracking-widest mb-6 flex items-center gap-2">
+                                全國選情預測
                             </h2>
-                            <div className="space-y-4">
+                            <div className="space-y-6">
                                 {activeParties.map((party) => {
                                     const pStats = (nationalStats as any)[party.id];
                                     const isMe = party.id === playerParty?.id;
+                                    const isLeading = party.id === (Object.entries(nationalStats).reduce((a, b) => (a[1] as any).votes > (b[1] as any).votes ? a : b)[0]);
+
                                     return (
                                         <div key={party.id} className="relative">
-                                            <div className="flex justify-between items-center mb-1.5">
-                                                <div className="flex items-center gap-1.5">
-                                                    {isMe && <span className="text-[10px] text-yellow-400">⭐</span>}
-                                                    <span className={`text-xs font-bold ${party.highlight} truncate max-w-[80px]`}>{party.name}{isMe ? "(您)" : ""}</span>
+                                            <div className="flex justify-between items-center mb-2">
+                                                <div className="flex items-center gap-2">
+                                                    <span className={`text-xs font-black ${party.highlight} flex items-center gap-1.5`}>
+                                                        {party.name} {isMe && <span className="text-[10px] opacity-70">(您)</span>}
+                                                    </span>
+                                                    {isLeading && (
+                                                        <span className="text-[9px] font-black bg-emerald-500/20 text-emerald-400 px-1.5 py-0.5 rounded uppercase tracking-tighter border border-emerald-500/20">
+                                                            領先
+                                                        </span>
+                                                    )}
                                                 </div>
-                                                <div className="text-[11px] font-mono font-medium">
-                                                    {pStats.percentage.toFixed(1)}% <span className="text-slate-500 text-[9px]">({(pStats.votes / 10000).toFixed(0)}萬)</span>
+                                                <div className="text-xs font-mono font-black text-slate-300">
+                                                    {pStats.percentage.toFixed(1)}% <span className="text-slate-500 font-medium ml-1">({(pStats.votes / 10000).toFixed(0)}萬)</span>
                                                 </div>
                                             </div>
-                                            <div className="w-full h-1 bg-slate-800 rounded-full overflow-hidden shadow-inner">
-                                                <div className={`h-full ${party.hex} transition-all duration-700 ease-out shadow-[0_0_8px_rgba(255,255,255,0.1)]`} style={{width: `${pStats.percentage}%`}} />
+                                            <div className="w-full h-2 bg-slate-900 rounded-full overflow-hidden border border-white/5">
+                                                <div 
+                                                    className={`h-full ${party.hex} transition-all duration-1000 ease-out shadow-[0_0_12px_rgba(255,255,255,0.05)]`} 
+                                                    style={{width: `${pStats.percentage}%`}} 
+                                                />
                                             </div>
                                         </div>
                                     );
@@ -681,51 +701,38 @@ export default function App() {
                         </div>
 
                         {/* News Alert Panel */}
-                        <div className="flex-1 flex flex-col bg-slate-950/40 rounded-xl border border-white/5 overflow-hidden min-h-0 mb-4">
-                            <div className="p-3 border-b border-white/5 bg-white/2 flex items-center justify-between">
-                                <h2 className="text-xs font-black text-slate-500 uppercase tracking-widest flex items-center gap-2">
-                                    <span className="text-lg">📰</span> 最新選戰快報
+                        <div className="flex-1 flex flex-col bg-[#1e293b]/20 rounded-2xl border border-white/5 overflow-hidden min-h-0 mb-6">
+                            <div className="p-4 border-b border-white/5 bg-white/2">
+                                <h2 className="text-[10px] font-black text-slate-500 uppercase tracking-[0.2em] flex items-center gap-2 italic">
+                                    最新選戰報
                                 </h2>
                             </div>
-                            <div className="flex-1 overflow-y-auto p-3 space-y-3 custom-scrollbar">
+                            <div className="flex-1 overflow-y-auto p-4 space-y-4 custom-scrollbar">
                                 {!isElection ? (
                                     news.length === 0 ? (
-                                        <div className="h-full flex flex-col items-center justify-center text-slate-600 italic text-[11px] text-center px-4">
-                                            <div className="w-12 h-12 border-2 border-slate-800/50 rounded-full mb-3 flex items-center justify-center opacity-40">📭</div>
-                                            目前尚無重大選戰消息提示...
+                                        <div className="h-full flex flex-col items-center justify-center text-slate-600 italic text-xs text-center px-4 opacity-60">
+                                            目前尚無重大事件...
                                         </div>
                                     ) : (
                                         news.map((item, idx) => (
-                                            <div key={idx} className={`p-3 rounded-lg border-l-4 transition-all shadow-lg ${
-                                                item.isFlip ? 'bg-amber-500/20 border-amber-500 text-white animate-pulse' : 
-                                                'bg-slate-900 border-slate-800 text-slate-400'
-                                            }`}>
-                                                {item.isFlip && (
-                                                    <div className="text-[9px] font-black tracking-widest mb-1.5 uppercase p-0.5 rounded inline-block bg-amber-500/30 text-amber-200">
-                                                        ⚠️ 選情變天
-                                                    </div>
-                                                )}
-                                                <div className="text-[11px] leading-relaxed font-medium">{item.message}</div>
+                                            <div key={idx} className="flex gap-3 animate-fadeIn">
+                                                <div className="w-1.5 h-1.5 rounded-full bg-indigo-500 mt-1.5 shrink-0 shadow-[0_0_8px_rgba(99,102,241,0.5)]" />
+                                                <div className="text-[11px] leading-relaxed text-slate-400 font-medium">{item.message}</div>
                                             </div>
                                         ))
                                     )
                                 ) : (
                                     electionNews.map((item, idx) => (
-                                        <div key={idx} className="p-3 bg-white/5 border border-white/10 rounded-lg shadow-lg animate-fadeIn">
+                                        <div key={idx} className="p-3 bg-white/5 border border-white/10 rounded-xl shadow-lg animate-fadeIn mb-2">
                                             <div className="text-[10px] font-black text-slate-400 mb-2 border-b border-white/5 pb-1 uppercase tracking-widest">{item.message}</div>
                                             <div className="space-y-1.5">
                                                 {activeParties.map(p => {
                                                     const s = item.electionData?.stats[p.id];
                                                     if (!s) return null;
                                                     return (
-                                                        <div key={p.id} className="flex justify-between items-center text-[11px]">
-                                                            <div className="flex items-center gap-1.5">
-                                                                <div className={`w-2 h-2 rounded-full ${p.hex}`} />
-                                                                <span className="font-bold text-slate-200">{p.name}</span>
-                                                            </div>
-                                                            <div className="font-mono text-slate-200">
-                                                                <span className="font-black">{s.percentage.toFixed(1)}%</span>
-                                                            </div>
+                                                        <div key={p.id} className="flex justify-between items-center text-[10px]">
+                                                            <span className={`font-bold ${p.highlight}`}>{p.name}</span>
+                                                            <span className="font-black text-slate-200">{s.percentage.toFixed(1)}%</span>
                                                         </div>
                                                     );
                                                 })}
@@ -736,23 +743,24 @@ export default function App() {
                             </div>
                         </div>
 
-                        {/* End Turn or Finalize Election */}
-                        {!isElection ? (
-                            <button 
-                                onClick={handleEndTurn} 
-                                className="w-full py-4 bg-indigo-700/80 hover:bg-indigo-600 border border-white/10 rounded-xl text-white font-black tracking-[0.2em] shadow-lg shadow-indigo-900/40 transition-all hover:-translate-y-0.5 active:translate-y-0 group overflow-hidden relative"
-                            >
-                                <div className="absolute inset-0 bg-white/10 translate-x-[-100%] group-hover:translate-x-[100%] transition-transform duration-700 pointer-events-none" />
-                                結束本週進度
-                            </button>
-                        ) : electionFinished && (
-                            <button 
-                                onClick={() => setGameState('GAME_OVER')} 
-                                className="w-full py-4 bg-red-600 hover:bg-red-500 rounded-xl text-white font-black tracking-[0.2em] shadow-lg animate-bounce"
-                            >
-                                查看最終結果
-                            </button>
-                        )}
+                        {/* End Turn Button - Integrated Bottom */}
+                        <div className="mt-auto">
+                            {!isElection ? (
+                                <button 
+                                    onClick={handleEndTurn} 
+                                    className="w-full py-4 bg-[#4f46e5] hover:bg-[#4338ca] text-white rounded-xl font-black tracking-[0.2em] shadow-xl shadow-indigo-900/20 transition-all hover:scale-[1.02] active:scale-[0.98] text-sm"
+                                >
+                                    結束本週
+                                </button>
+                            ) : electionFinished && (
+                                <button 
+                                    onClick={() => setGameState('GAME_OVER')} 
+                                    className="w-full py-4 bg-[#ef4444] hover:bg-[#dc2626] rounded-xl text-white font-black tracking-[0.2em] shadow-xl transition-all animate-pulse text-sm"
+                                >
+                                    查看最終結果
+                                </button>
+                            )}
+                        </div>
                     </div>
                 </div>
 
@@ -845,65 +853,73 @@ export default function App() {
                         </g>
                     </svg>
 
-                    {/* Map Legend */}
+                    {/* Map Legend - Classic Vercel Style */}
                     {!isElection && (
-                        <div className="absolute bottom-6 left-1/2 -translate-x-1/2 flex items-center gap-6 glass-panel px-6 py-2 rounded-full border border-white/5 shadow-2xl backdrop-blur-md">
-                            <div className="flex items-center gap-2">
-                                <div className="w-3 h-3 rounded-full bg-yellow-400 shadow-[0_0_8px_rgba(250,204,21,0.6)] animate-pulse" />
-                                <span className="text-[10px] text-slate-300 font-bold tracking-widest italic opacity-80">金黃色代表領先差距 3.0% 以內的搖擺選區</span>
+                        <div className="absolute bottom-8 left-1/2 -translate-x-1/2 flex items-center gap-4 glass-panel px-8 py-3 rounded-full border border-white/10 shadow-2xl backdrop-blur-xl">
+                            <div className="flex items-center gap-3">
+                                <div className="w-3 h-3 rounded-full bg-[#facc15] shadow-[0_0_12px_rgba(250,204,21,0.6)] animate-pulse" />
+                                <span className="text-[11px] text-slate-300 font-black tracking-widest italic opacity-90">金黃色代表前兩名差距 3% 以內的搖擺州</span>
                             </div>
                         </div>
                     )}
                 </div>
                 
-                {/* Right Sidebar: Regional Context & Actions (desktop: fixed-width panel; mobile: full-screen overlay) */}
+                {/* Right Sidebar: Regional Context & Actions - Classic Dashboard Style */}
                 {(selectedRegionData && !isElection) && (
                     <div className="
                         md:w-[340px] md:border-l md:border-white/10 md:relative md:animate-slideInRight
                         fixed inset-0 md:inset-auto z-50 md:z-30
-                        bg-[#050a14]/95 md:bg-[#000000]/40
-                        backdrop-blur-xl p-6 flex flex-col
-                        overflow-y-auto
-                        md:shrink-0 md:group/panel
+                        bg-[#0a0e1a]/95 md:bg-[#0f172a]/80
+                        backdrop-blur-2xl p-7 flex flex-col
+                        overflow-y-auto custom-scrollbar
+                        md:shrink-0
                     ">
                         {/* Panel Header */}
-                        <div className="flex justify-between items-start mb-6">
+                        <div className="flex justify-between items-start mb-8">
                             <div>
-                                <h2 className="text-3xl font-black text-white tracking-tighter">{selectedRegionData.name}</h2>
-                                <div className="flex items-center gap-2 mt-1 text-[10px] text-slate-500 font-bold uppercase tracking-wider">
-                                    <span>👥 選舉人：{(selectedRegionData.votes / 10000).toLocaleString()} 萬</span>
+                                <h2 className="text-4xl font-black text-white tracking-tighter mb-1">{selectedRegionData.name}</h2>
+                                <div className="flex items-center gap-2 text-[11px] text-slate-500 font-bold uppercase tracking-widest">
+                                    <span>👥 選舉人：</span>
+                                    <span className="text-slate-300">{(selectedRegionData.votes / 10000).toLocaleString()} 萬</span>
                                 </div>
                             </div>
-                            <button onClick={() => setSelectedRegionId(null)} className="w-8 h-8 rounded-full bg-white/5 hover:bg-white/10 flex items-center justify-center transition-colors">✕</button>
+                            <button 
+                                onClick={() => setSelectedRegionId(null)} 
+                                className="w-9 h-9 rounded-full bg-white/5 hover:bg-white/10 flex items-center justify-center transition-all hover:rotate-90"
+                            >
+                                <span className="text-xl">✕</span>
+                            </button>
                         </div>
 
-                        {/* Local Polling Bars */}
-                        <div className="bg-slate-900/40 rounded-xl p-4 border border-white/5 mb-8 shadow-inner">
-                            <h3 className="text-[10px] font-black text-slate-600 uppercase tracking-[0.2em] mb-4 text-center">在地民意支持度</h3>
-                            <div className="space-y-3">
-                                {activeParties.map(p => {
-                                    const pct = pollingData[selectedRegionData.id]?.[p.id as keyof PartySupport] || 0;
-                                    return (
-                                        <div key={p.id} className="flex items-center gap-3">
-                                            <div className={`w-12 text-[10px] font-black ${p.highlight} truncate`}>{p.name}</div>
-                                            <div className="flex-1 h-3 bg-slate-950 rounded-full overflow-hidden border border-white/5">
-                                                <div className={`h-full ${p.hex} transition-all duration-1000 shadow-[0_0_10px_rgba(255,255,255,0.05)]`} style={{width: `${pct}%`}} />
-                                            </div>
-                                            <div className="w-12 text-[10px] font-mono font-bold text-right text-slate-400">{pct.toFixed(1)}%</div>
+                        {/* Local Polling Bars - Refined Style */}
+                        <div className="space-y-5 mb-10 overflow-hidden">
+                            {activeParties.map(p => {
+                                const pct = pollingData[selectedRegionData.id]?.[p.id as keyof PartySupport] || 0;
+                                return (
+                                    <div key={p.id} className="relative">
+                                        <div className="flex justify-between items-center mb-2">
+                                            <span className={`text-[11px] font-black uppercase tracking-widest ${p.highlight}`}>{p.name}民調</span>
+                                            <span className="text-[11px] font-mono font-black text-slate-200">{pct.toFixed(1)}%</span>
                                         </div>
-                                    );
-                                })}
-                            </div>
+                                        <div className="w-full h-1.5 bg-slate-900 rounded-full overflow-hidden border border-white/5">
+                                            <div 
+                                                className={`h-full ${p.hex} transition-all duration-1000 shadow-[0_0_10px_rgba(255,255,255,0.05)]`} 
+                                                style={{width: `${pct}%`}} 
+                                            />
+                                        </div>
+                                    </div>
+                                );
+                            })}
                         </div>
                         
                         <div className="space-y-4">
-                            <div className="text-[10px] font-black text-slate-600 uppercase tracking-widest pl-1">您的戰略行動規劃</div>
+                            <div className="text-[10px] font-black text-slate-600 uppercase tracking-[0.2em] mb-2 pl-1">您的策略行動</div>
                             
-                            <ActionCard icon="🏟️" title="舉辦造勢集會" desc="在該區域舉行大規模群眾集會，迅速凝聚支持者動能並提升民調百分比。" cost="-1 AP | -$1M" color="yellow" onClick={() => handleActionClick('RALLY')} />
-                            <ActionCard icon="📺" title="投放地方廣告" desc="透過精準的在地媒體投放，強化品牌形象並穩定中立選民的投票意向。" cost="-1 AP | -$500k" color="blue" onClick={() => handleActionClick('ADS')} />
-                            <ActionCard icon="💰" title="舉辦地方募款" desc="與地方精英及各界支持者舉辦餐敘，換取選戰開銷所需的大量資金（限次數）。" cost="-1 AP | +$1.5M" color="emerald" onClick={() => handleActionClick('FUNDRAISE')} />
-                            <ActionCard icon="🏛️" title="建立區域總部" desc="正式成立在地競選辦公室，長期經營基層組織，每週提供額外的民調複利加持。" cost="-2 AP | -$3M" color="purple" onClick={() => handleActionClick('HQ')} />
-                            <ActionCard icon="🕵️" title="挖掘驚天黑料" desc="針對對手進行不當行為稽查，若爆料成功可能引發選情地震（對其民調造成毀滅打擊）。" cost="-2 AP | -$1.5M" color="red" isHighRisk onClick={() => handleActionClick('OPPO')} />
+                            <ActionCard icon="🏟️" title="舉辦萬人造勢" desc="大幅拉抬當地 1~2.5% 民調。透過集會展現基層動員實力。" cost="-1 AP | -$1M" color="yellow" onClick={() => handleActionClick('RALLY')} />
+                            <ActionCard icon="📺" title="投放地方廣告" desc="小幅提升 0.5~1.2% 民調。針對在地選民進行精準文宣攻擊。" cost="-1 AP | -$500k" color="blue" onClick={() => handleActionClick('ADS')} />
+                            <ActionCard icon="🗳️" title="舉辦地方募款餐會" desc="越大的縣市募得的金額越多！但在同一地區多次募款會使選民疲乏，收入會隨之遞減。" cost="-1 AP | +$1.5M" color="emerald" onClick={() => handleActionClick('FUNDRAISE')} />
+                            <ActionCard icon="🏛️" title="成立競選總部" desc="常駐效果：地方派系固本，每回合自動 +0.5% 民調。" cost="-2 AP | -$3M" color="purple" onClick={() => handleActionClick('HQ')} />
+                            <ActionCard icon="💣" title="挖掘對手驚天黑料" desc="【豪賭注意】可能重創對手選情，無實證浪費錢，或不幸被抓包「抹黑」而反損自身民調！" cost="-2 AP | -$1.5M" color="red" isHighRisk onClick={() => handleActionClick('OPPO')} />
                         </div>
                     </div>
                 )}
@@ -1025,26 +1041,42 @@ export default function App() {
 // Sub-component for better organization
 function ActionCard({ icon, title, desc, cost, color, onClick, isHighRisk }: any) {
     const colorClasses: Record<string, string> = {
-        yellow: 'bg-yellow-500/10 border-yellow-500/20 text-yellow-500 hover:bg-yellow-500/20',
-        blue: 'bg-blue-500/10 border-blue-500/20 text-blue-500 hover:bg-blue-500/20',
-        emerald: 'bg-emerald-500/10 border-emerald-500/20 text-emerald-500 hover:bg-emerald-500/20',
-        purple: 'bg-purple-500/10 border-purple-500/20 text-purple-500 hover:bg-purple-500/20',
-        red: 'bg-red-500/10 border-red-500/20 text-red-500 hover:bg-red-500/20'
+        yellow: 'bg-yellow-500/5 border-yellow-500/10 text-yellow-500 hover:bg-yellow-500/10 hover:border-yellow-500/30',
+        blue: 'bg-blue-500/5 border-blue-500/10 text-blue-500 hover:bg-blue-500/10 hover:border-blue-500/30',
+        emerald: 'bg-emerald-500/5 border-emerald-500/10 text-emerald-500 hover:bg-emerald-500/10 hover:border-emerald-500/30',
+        purple: 'bg-purple-500/5 border-purple-500/10 text-purple-500 hover:bg-purple-500/10 hover:border-purple-500/30',
+        red: 'bg-red-500/5 border-red-500/10 text-red-500 hover:bg-red-500/10 hover:border-red-500/30'
     };
+
+    // Parse cost into AP and Money for specific styling if needed
+    const parts = cost.split('|').map((s: string) => s.trim());
 
     return (
         <button 
             onClick={onClick} 
             className={`w-full p-4 rounded-xl border text-left transition-all hover:scale-[1.02] flex items-center gap-4 group ${colorClasses[color]}`}
         >
-            <span className="text-2xl group-hover:scale-125 transition-transform shrink-0">{icon}</span>
-            <div className="flex-1">
-                <div className="flex justify-between items-center mb-0.5">
-                    <span className="font-black text-sm">{title}</span>
-                    <span className="text-[10px] font-mono font-bold opacity-70">{cost}</span>
+            <span className="text-3xl group-hover:scale-110 transition-transform shrink-0 drop-shadow-lg">{icon}</span>
+            <div className="flex-1 min-w-0">
+                <div className="flex justify-between items-start mb-0.5">
+                    <span className="font-black text-sm text-slate-200 truncate">{title}</span>
+                    <div className="flex flex-col items-end shrink-0 ml-2">
+                        {parts.map((p: string, i: number) => (
+                            <span key={i} className={`text-[9px] font-black font-mono uppercase tracking-tighter ${
+                                p.includes('AP') ? 'text-yellow-500/80' : 
+                                p.includes('+') ? 'text-emerald-400' : 'text-red-400'
+                            }`}>
+                                {p}
+                            </span>
+                        ))}
+                    </div>
                 </div>
-                <p className="text-[10px] text-slate-400 font-medium leading-tight line-clamp-2">{desc}</p>
-                {isHighRisk && <div className="mt-1.5 inline-block text-[8px] font-black uppercase tracking-widest bg-red-500/20 px-1.5 py-0.5 rounded text-red-400">🚨 核彈級操作</div>}
+                <p className="text-[10px] text-slate-500 font-medium leading-normal line-clamp-2 italic">{desc}</p>
+                {isHighRisk && (
+                    <div className="mt-2 inline-flex items-center gap-1 text-[8px] font-black uppercase tracking-widest bg-red-500/20 px-1.5 py-0.5 rounded text-red-400 border border-red-500/20">
+                        <span>🚨</span> 核彈級操作
+                    </div>
+                )}
             </div>
         </button>
     );
