@@ -193,7 +193,6 @@ export default function App() {
 
     const geoData: any = twGeoData;
     const [selectedRegionId, setSelectedRegionId] = useState<string | null>(null);
-    const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
 
     // Core Game State
     const [turn, setTurn] = useState(1);
@@ -211,15 +210,16 @@ export default function App() {
     const [aiVps, setAiVps] = useState<Record<string, string>>({});
     const [currentEvent, setCurrentEvent] = useState<any>(null);
     const [gameEvents, setGameEvents] = useState<any[]>([]);
-    const [debateInvestment, setDebateInvestment] = useState('');
     const [completedModals, setCompletedModals] = useState<string[]>([]);
 
-    // Election Night States
-    const [calledRegions, setCalledRegions] = useState<string[]>([]);
-    const [electionNews, setElectionNews] = useState<NewsEvent[]>([]);
-    const [electionFinished, setElectionFinished] = useState(false);
-    const [hideVictoryOverlay, setHideVictoryOverlay] = useState(false);
+    const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
     const [finalWinner, setFinalWinner] = useState<any>(null);
+    const [hideVictoryOverlay, setHideVictoryOverlay] = useState(true);
+
+    // Election Night States
+    const [electionNews, setElectionNews] = useState<NewsEvent[]>([]);
+    const [calledRegions, setCalledRegions] = useState<string[]>([]);
+    const [electionFinished, setElectionFinished] = useState(false);
 
     const svgWidth = 800;
     const svgHeight = 800;
@@ -930,14 +930,33 @@ export default function App() {
                     )}
 
                     {activeModal === 'DEBATE' && (
-                        <div className="glass-panel max-w-lg w-full p-8 rounded-2xl text-center animate-scaleIn">
+                        <div className="glass-panel max-w-lg w-full p-8 rounded-2xl text-center animate-scaleIn border-b-4 border-indigo-500">
                             <div className="text-5xl mb-6">🎙️</div>
                             <h2 className="text-2xl font-black mb-4 text-white uppercase tracking-widest">電視辯論大會</h2>
-                            <p className="text-slate-400 mb-6 text-sm leading-relaxed">這是向全國選民展現論述實力的關鍵時刻。投入資金強化幕僚團隊，能獲得更好的辯論表現。</p>
-                            <div className="flex gap-4 mb-8">
-                                <button onClick={() => { setPartyFunds(prev => ({ ...prev, [playerParty.id]: prev[playerParty.id] - 1000000 })); setActiveModal(null); setCompletedModals(prev => [...prev, `DEBATE_${turn}`]); }} className="flex-1 py-4 bg-indigo-600 rounded-xl font-bold hover:bg-indigo-500 transition-all shadow-lg shadow-indigo-600/20 text-sm">投入 $100萬 (穩健)</button>
-                                <button onClick={() => { setActiveModal(null); setCompletedModals(prev => [...prev, `DEBATE_${turn}`]); }} className="flex-1 py-4 bg-slate-800 rounded-xl font-bold hover:bg-slate-700 transition-all text-sm">不額外投入</button>
+                            <p className="text-slate-400 mb-6 text-sm leading-relaxed italic">這是向全國選民展現論述實力的關鍵時刻。投入資金強化幕僚團隊，能獲得更好的辯論表現。</p>
+                            <div className="flex flex-col sm:flex-row gap-4 mb-4">
+                                {partyFunds[playerParty?.id] >= 1000000 ? (
+                                    <button 
+                                        onClick={() => { 
+                                            setPartyFunds(prev => ({ ...prev, [playerParty.id]: prev[playerParty.id] - 1000000 })); 
+                                            setActiveModal(null); 
+                                            setCompletedModals(prev => [...prev, `DEBATE_${turn}`]); 
+                                        }} 
+                                        className="flex-1 py-4 bg-indigo-600 rounded-xl font-bold hover:bg-indigo-500 transition-all shadow-lg shadow-indigo-600/20 text-sm border border-indigo-400/30"
+                                    >
+                                        投入 $100萬 (穩健)
+                                    </button>
+                                ) : (
+                                    <button 
+                                        disabled
+                                        className="flex-1 py-4 bg-slate-800/50 rounded-xl font-bold text-slate-500 cursor-not-allowed text-sm border border-white/5 opacity-50"
+                                    >
+                                        資金不足 ($100萬)
+                                    </button>
+                                )}
+                                <button onClick={() => { setActiveModal(null); setCompletedModals(prev => [...prev, `DEBATE_${turn}`]); }} className="flex-1 py-4 bg-slate-800 rounded-xl font-bold hover:bg-slate-700 transition-all text-sm border border-white/10">不額外投入</button>
                             </div>
+                            <div className="text-[10px] text-slate-500 font-bold uppercase tracking-[0.2em]">目前資金: ${(partyFunds[playerParty?.id] || 0).toLocaleString()}</div>
                         </div>
                     )}
 
