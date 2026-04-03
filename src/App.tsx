@@ -756,40 +756,75 @@ export default function App() {
                     </div>
                 </div>
 
-                {/* Mobile Bottom Bar: shows national stats + end turn button */}
+                {/* Mobile Bottom Bar: campaign = stats+end-turn; election night = live counting feed */}
                 <div className="md:hidden fixed bottom-0 left-0 right-0 z-40 bg-[#0f172a]/95 border-t border-white/10 backdrop-blur-xl px-4 pt-3 pb-safe">
-                    <div className="flex justify-between items-center mb-2">
-                        {activeParties.map(p => {
-                            const pStats = (nationalStats as any)[p.id];
-                            const isMe = p.id === playerParty?.id;
-                            return (
-                                <div key={p.id} className="flex items-center gap-1.5">
-                                    {isMe && <span className="text-[9px] text-yellow-400">⭐</span>}
-                                    <span className={`text-[11px] font-black ${p.highlight}`}>{p.name}</span>
-                                    <span className="text-[11px] font-mono text-slate-300">{pStats.percentage.toFixed(1)}%</span>
-                                </div>
-                            );
-                        })}
-                    </div>
                     {!isElection ? (
-                        <button
-                            onClick={handleEndTurn}
-                            className="w-full py-3 bg-indigo-700/90 hover:bg-indigo-600 rounded-xl text-white font-black tracking-[0.15em] text-sm shadow-lg transition-all active:scale-95 mb-1"
-                        >
-                            結束本週進度 · 第 {turn}/{MAX_TURNS} 週
-                        </button>
-                    ) : electionFinished && (
-                        <button
-                            onClick={() => setGameState('GAME_OVER')}
-                            className="w-full py-3 bg-red-600 hover:bg-red-500 rounded-xl text-white font-black tracking-[0.15em] text-sm shadow-lg animate-bounce mb-1"
-                        >
-                            查看最終結果
-                        </button>
+                        <>
+                            <div className="flex justify-between items-center mb-2">
+                                {activeParties.map(p => {
+                                    const pStats = (nationalStats as any)[p.id];
+                                    const isMe = p.id === playerParty?.id;
+                                    return (
+                                        <div key={p.id} className="flex items-center gap-1.5">
+                                            {isMe && <span className="text-[9px] text-yellow-400">⭐</span>}
+                                            <span className={`text-[11px] font-black ${p.highlight}`}>{p.name}</span>
+                                            <span className="text-[11px] font-mono text-slate-300">{pStats.percentage.toFixed(1)}%</span>
+                                        </div>
+                                    );
+                                })}
+                            </div>
+                            <button
+                                onClick={handleEndTurn}
+                                className="w-full py-3 bg-indigo-700/90 hover:bg-indigo-600 rounded-xl text-white font-black tracking-[0.15em] text-sm shadow-lg transition-all active:scale-95 mb-1"
+                            >
+                                結束本週進度 · 第 {turn}/{MAX_TURNS} 週
+                            </button>
+                        </>
+                    ) : (
+                        <>
+                            {/* Live counting feed for mobile election night */}
+                            <div className="flex items-center gap-2 pb-2 border-b border-white/10 mb-2">
+                                <div className="w-2 h-2 rounded-full bg-red-500 animate-pulse" />
+                                <span className="text-[11px] font-black text-white uppercase tracking-widest">LIVE · 開票中 {calledRegions.length}/{TAIWAN_REGIONS.length} 區</span>
+                                <div className="ml-auto flex gap-2">
+                                    {activeParties.map(p => (
+                                        <span key={p.id} className={`text-[10px] font-black font-mono ${p.highlight}`}>
+                                            {(nationalStats as any)[p.id]?.percentage.toFixed(1)}%
+                                        </span>
+                                    ))}
+                                </div>
+                            </div>
+                            <div className="max-h-[110px] overflow-y-auto space-y-1 custom-scrollbar">
+                                {electionNews.slice(0, 8).map((item, idx) => (
+                                    <div key={idx} className="flex items-center justify-between bg-white/5 rounded-lg px-3 py-1.5">
+                                        <span className="text-[11px] text-slate-300 font-bold">{item.message}</span>
+                                        <div className="flex gap-2 shrink-0">
+                                            {activeParties.map(p => {
+                                                const s = item.electionData?.stats[p.id];
+                                                if (!s) return null;
+                                                return <span key={p.id} className={`text-[10px] font-mono font-black ${p.highlight}`}>{s.percentage.toFixed(0)}%</span>;
+                                            })}
+                                        </div>
+                                    </div>
+                                ))}
+                                {electionNews.length === 0 && (
+                                    <div className="text-center text-slate-500 text-[11px] py-2">開票中，請稍後...</div>
+                                )}
+                            </div>
+                            {electionFinished && (
+                                <button
+                                    onClick={() => setGameState('GAME_OVER')}
+                                    className="w-full py-2 mt-2 bg-red-600 hover:bg-red-500 rounded-xl text-white font-black tracking-[0.15em] text-sm animate-bounce mb-1"
+                                >
+                                    查看最終結果
+                                </button>
+                            )}
+                        </>
                     )}
                 </div>
 
-                {/* Center: Map Display - on mobile leave room for bottom tab bar */}
-                <div className="flex-1 relative flex items-center justify-center overflow-hidden bg-[#0a0e1a]/80 pb-[100px] md:pb-0">
+                {/* Center: Map - election night mobile bottom bar is taller */}
+                <div className={`flex-1 relative flex items-center justify-center overflow-hidden bg-[#0a0e1a]/80 md:pb-0 ${isElection ? 'pb-[230px]' : 'pb-[100px]'}`}>
                     <svg className="w-full h-full p-4" viewBox={`0 0 ${svgWidth} ${svgHeight}`} preserveAspectRatio="xMidYMid meet">
                         <g>
                             {geoData.features.map((feature: any, i: number) => {
@@ -925,23 +960,41 @@ export default function App() {
                     )}
 
                     {gameState === 'GAME_OVER' && (
-                        <div className="glass-panel max-w-4xl w-full p-12 rounded-3xl text-center border-white/10 shadow-[0_0_50px_rgba(0,0,0,0.5)] animate-scaleIn">
-                            <h2 className="text-6xl font-black text-white mb-4 tracking-tighter uppercase italic">Election Final Results</h2>
-                            <div className="h-1 w-24 bg-indigo-500 mx-auto mb-10" />
+                        <div className="glass-panel max-w-4xl w-full p-6 md:p-12 rounded-3xl text-center border-white/10 shadow-[0_0_50px_rgba(0,0,0,0.5)] animate-scaleIn mx-4">
+                            <h2 className="text-3xl md:text-6xl font-black text-white mb-4 tracking-tighter uppercase italic">Election Final Results</h2>
+                            <div className="h-1 w-24 bg-indigo-500 mx-auto mb-6 md:mb-10" />
                             
-                            <div className="grid grid-cols-1 md:grid-cols-3 gap-8 mb-12">
+                            <div className="grid grid-cols-1 md:grid-cols-3 gap-4 md:gap-8 mb-8 md:mb-12">
                                 {activeParties.map(p => {
                                     const stats = (nationalStats as any)[p.id];
+                                    const maxPct = Math.max(...activeParties.map(ap => (nationalStats as any)[ap.id].percentage));
+                                    const isWinner = stats.percentage >= maxPct;
                                     return (
-                                        <div key={p.id} className="p-8 bg-slate-900/50 rounded-2xl border border-white/5 relative overflow-hidden">
-                                            <div className={`text-5xl font-black mb-2 ${p.highlight}`}>{stats.percentage.toFixed(1)}%</div>
-                                            <div className="text-xs text-slate-500 font-bold uppercase tracking-widest mb-4">{p.name}</div>
+                                        <div key={p.id} className={`p-5 md:p-8 rounded-2xl border relative overflow-hidden ${
+                                            isWinner ? 'bg-yellow-400/10 border-yellow-400/40 shadow-[0_0_30px_rgba(250,204,21,0.15)]' : 'bg-slate-900/50 border-white/5'
+                                        }`}>
+                                            {isWinner && <div className="text-2xl mb-1">🏆</div>}
+                                            <div className={`text-4xl md:text-5xl font-black mb-2 ${p.highlight}`}>{stats.percentage.toFixed(1)}%</div>
+                                            <div className="text-xs text-slate-500 font-bold uppercase tracking-widest mb-3">{p.name}</div>
                                             <div className="text-sm font-mono text-slate-400">{(stats.votes / 10000).toFixed(0)}萬 票</div>
                                         </div>
                                     );
                                 })}
                             </div>
-                            <button onClick={() => window.location.reload()} className="px-12 py-4 bg-indigo-600 text-white rounded-full font-black tracking-[0.2em] hover:bg-indigo-500 transition-all shadow-xl shadow-indigo-600/30 text-lg uppercase">Restart Simulation</button>
+                            <div className="flex flex-col sm:flex-row gap-4 justify-center">
+                                <button 
+                                    onClick={() => setGameState('ELECTION_NIGHT')} 
+                                    className="px-8 py-4 bg-slate-700 text-white rounded-full font-black tracking-[0.1em] hover:bg-slate-600 transition-all text-sm"
+                                >
+                                    🗺️ 回到開票地圖
+                                </button>
+                                <button 
+                                    onClick={() => window.location.reload()} 
+                                    className="px-10 md:px-12 py-4 bg-indigo-600 text-white rounded-full font-black tracking-[0.1em] md:tracking-[0.2em] hover:bg-indigo-500 transition-all shadow-xl shadow-indigo-600/30 text-sm md:text-lg uppercase"
+                                >
+                                    🔄 Restart Simulation
+                                </button>
+                            </div>
                         </div>
                     )}
                 </div>
