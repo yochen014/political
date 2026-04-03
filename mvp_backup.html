@@ -1,0 +1,431 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>台灣政治模擬器 - Taiwan Political Simulator</title>
+    <!-- React & ReactDOM -->
+    <script src="https://unpkg.com/react@18/umd/react.development.js" crossorigin></script>
+    <script src="https://unpkg.com/react-dom@18/umd/react-dom.development.js" crossorigin></script>
+    <!-- Babel for JSX -->
+    <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- D3.js -->
+    <script src="https://d3js.org/d3.v7.min.js"></script>
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    colors: {
+                        blueTeam: '#000095',
+                        greenTeam: '#1b9431',
+                        whiteTeam: '#28cdcc',
+                        darkBg: '#0f172a',
+                        cardBg: 'rgba(30, 41, 59, 0.7)'
+                    }
+                }
+            }
+        }
+    </script>
+    <style>
+        body {
+            background-color: #0f172a;
+            color: #e2e8f0;
+            font-family: 'Inter', system-ui, -apple-system, sans-serif;
+            margin: 0;
+            padding: 0;
+            overflow: hidden;
+        }
+        .glass-panel {
+            background: rgba(30, 41, 59, 0.4);
+            backdrop-filter: blur(10px);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
+        }
+        .county-path {
+            transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+            cursor: pointer;
+            stroke: rgba(255, 255, 255, 0.5);
+            stroke-width: 0.5;
+            vector-effect: non-scaling-stroke;
+        }
+        .county-path:hover {
+            stroke: #ffffff;
+            stroke-width: 2;
+            fill: rgba(255, 255, 255, 0.5) !important;
+            filter: drop-shadow(0 0 8px rgba(255,255,255,0.8));
+        }
+        .county-path.selected {
+            stroke: #fbbf24;
+            stroke-width: 2.5;
+            filter: drop-shadow(0 0 10px rgba(251,191,36,0.8));
+            z-index: 10;
+        }
+        ::-webkit-scrollbar { width: 6px; }
+        ::-webkit-scrollbar-track { background: rgba(0,0,0,0.1); }
+        ::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.2); border-radius: 10px; }
+    </style>
+</head>
+<body>
+    <div id="root"></div>
+
+    <script type="text/babel">
+        const { useState, useEffect, useMemo, useRef } = React;
+
+        const REGIONS_DATA = [
+            { name: '基隆市', votes: 300000, defaultColor: '#000095' },
+            { name: '台北市', votes: 2000000, defaultColor: '#000095' },
+            { name: '新北市', votes: 3300000, defaultColor: '#000095' },
+            { name: '桃園市', votes: 1700000, defaultColor: '#28cdcc' },
+            { name: '新竹縣', votes: 450000, defaultColor: '#000095' },
+            { name: '新竹市', votes: 350000, defaultColor: '#28cdcc' },
+            { name: '苗栗縣', votes: 400000, defaultColor: '#000095' },
+            { name: '台中市', votes: 2200000, defaultColor: '#1b9431' },
+            { name: '彰化縣', votes: 1000000, defaultColor: '#1b9431' },
+            { name: '南投縣', votes: 400000, defaultColor: '#000095' },
+            { name: '雲林縣', votes: 500000, defaultColor: '#1b9431' },
+            { name: '嘉義縣', votes: 400000, defaultColor: '#1b9431' },
+            { name: '嘉義市', votes: 200000, defaultColor: '#1b9431' },
+            { name: '台南市', votes: 1500000, defaultColor: '#1b9431' },
+            { name: '高雄市', votes: 2200000, defaultColor: '#1b9431' },
+            { name: '屏東縣', votes: 600000, defaultColor: '#1b9431' },
+            { name: '宜蘭縣', votes: 350000, defaultColor: '#1b9431' },
+            { name: '花蓮縣', votes: 250000, defaultColor: '#000095' },
+            { name: '台東縣', votes: 170000, defaultColor: '#000095' },
+            { name: '澎湖縣', votes: 80000, defaultColor: '#000095' },
+            { name: '金門縣', votes: 100000, defaultColor: '#000095' },
+            { name: '連江縣', votes: 10000, defaultColor: '#000095' },
+        ];
+
+        const PARTIES = [
+            { id: 'BLUE', name: '藍營', color: '#000095', hex: 'bg-blueTeam', highlight: 'text-blue-400', description: '擁有強大地方根基與組織動員力的傳統大黨', logoUrl: 'https://commons.wikimedia.org/wiki/Special:FilePath/Kuomintang_Emblem.svg' },
+            { id: 'GREEN', name: '綠營', color: '#1b9431', hex: 'bg-greenTeam', highlight: 'text-green-400', description: '主張本土意識，具有強大社群聲量與執政資源', logoUrl: 'https://commons.wikimedia.org/wiki/Special:FilePath/The_Democratic_Progressive_Party_Logo.svg' },
+            { id: 'WHITE', name: '白營', color: '#28cdcc', hex: 'bg-whiteTeam', highlight: 'text-teal-400', description: '主打超越藍綠的新興勢力，深受年輕與中間選民支持', logoUrl: 'https://commons.wikimedia.org/wiki/Special:FilePath/Taiwan_People%27s_Party_logo.svg' }
+        ];
+
+        function App() {
+            const [gameState, setGameState] = useState('SELECT_FACTION'); // 'SELECT_FACTION', 'PLAYING'
+            const [playerParty, setPlayerParty] = useState(null);
+
+            const [geoData, setGeoData] = useState(null);
+            const [selectedRegionId, setSelectedRegionId] = useState(null);
+            
+            const [turn, setTurn] = useState(1);
+            const [funds, setFunds] = useState(5000000);
+            const [ap, setAp] = useState(3);
+
+            useEffect(() => {
+                fetch('https://raw.githubusercontent.com/g0v/twgeojson/master/json/twCounty2010.geo.json')
+                    .then(res => res.json())
+                    .then(data => setGeoData(data));
+            }, []);
+
+            const svgWidth = 800;
+            const svgHeight = 800;
+
+            const pathGenerator = useMemo(() => {
+                if (!geoData) return null;
+                const projection = d3.geoMercator()
+                    .center([120.9, 23.8])
+                    .scale(10000)
+                    .translate([svgWidth / 2, svgHeight / 2]);
+                return d3.geoPath().projection(projection);
+            }, [geoData]);
+
+            const getRegionData = (feature) => {
+                let name = feature.properties.name || feature.properties.COUNTYNAME || "";
+                name = name.replace('臺', '台');
+                let found = REGIONS_DATA.find(r => r.name === name);
+                if (!found) found = { name: name, votes: 0, defaultColor: 'rgba(255,255,255,0.1)' };
+                return found;
+            };
+
+            const selectedRegionData = useMemo(() => {
+                if (!selectedRegionId || !geoData) return null;
+                const feature = geoData.features.find(f => (f.properties.COUNTYCODE || f.properties.COUNTYNAME) === selectedRegionId);
+                if (!feature) return null;
+                return getRegionData(feature);
+            }, [selectedRegionId, geoData]);
+
+            const handleRegionClick = (feature) => {
+                const id = feature.properties.COUNTYCODE || feature.properties.COUNTYNAME;
+                setSelectedRegionId(id);
+            };
+
+            const handleRallyClick = () => {
+                if (funds >= 1000000 && ap >= 1) {
+                    setFunds(f => f - 1000000);
+                    setAp(a => a - 1);
+                    alert(`【${playerParty.name}】在 ${selectedRegionData.name} 舉辦萬人造勢成功！支持度上升！`);
+                } else {
+                    alert('資金或體力不足！');
+                }
+            };
+
+            // 遊戲開始畫面：選擇陣營
+            if (gameState === 'SELECT_FACTION') {
+                return (
+                    <div className="h-screen w-screen bg-slate-900 flex items-center justify-center p-4 text-slate-200" style={{backgroundImage: 'url("data:image/svg+xml,%3Csvg width=\'60\' height=\'60\' viewBox=\'0 0 60 60\' xmlns=\'http://www.w3.org/2000/svg\'%3E%3Cg fill=\'none\' fill-rule=\'evenodd\'%3E%3Cg fill=\'#1e293b\' fill-opacity=\'0.4\'%3E%3Cpath d=\'M36 34v-4h-2v4h-4v2h4v4h2v-4h4v-2h-4zm0-30V0h-2v4h-4v2h4v4h2V6h4V4h-4zM6 34v-4H4v4H0v2h4v4h2v-4h4v-2H6zM6 4V0H4v4H0v2h4v4h2V6h4V4H6z\'/%3E%3C/g%3E%3C/g%3E%3C/svg%3E")'}}>
+                        <div className="glass-panel max-w-5xl w-full p-10 rounded-2xl flex flex-col items-center animate-[fadeIn_0.5s_ease-out] shadow-2xl">
+                            <h1 className="text-4xl font-black mb-2 tracking-widest text-white">選擇您的陣營勢力</h1>
+                            <p className="text-slate-400 mb-10 tracking-widest text-sm">TAIWAN POLITICAL SIMULATOR - 2024</p>
+                            
+                            <div className="grid grid-cols-1 md:grid-cols-3 gap-6 w-full">
+                                {PARTIES.map(party => (
+                                    <div 
+                                        key={party.id}
+                                        onClick={() => { setPlayerParty(party); setGameState('PLAYING'); }}
+                                        className="glass-panel border-white/5 p-8 rounded-xl cursor-pointer hover:scale-[1.03] transition-all text-center flex flex-col items-center group relative overflow-hidden"
+                                    >
+                                        <div className="absolute inset-0 opacity-10 group-hover:opacity-30 transition-opacity duration-500" style={{ backgroundColor: party.color }}></div>
+                                        <div 
+                                            className="w-20 h-20 rounded-full mb-6 shadow-xl flex items-center justify-center border-4 bg-white transition-transform group-hover:scale-110 duration-500" 
+                                            style={{ borderColor: party.color }}
+                                        >
+                                            <img src={party.logoUrl} alt={party.name} className="w-14 h-14 object-contain" />
+                                        </div>
+                                        <h2 className={`text-2xl font-bold mb-3 ${party.highlight}`}>{party.name}候選人</h2>
+                                        <p className="text-sm text-slate-400 leading-relaxed min-h-[60px]">{party.description}</p>
+
+                                        <button className="mt-6 w-full py-2 bg-white/5 hover:bg-white/10 rounded font-bold tracking-widest text-sm text-white/80 transition-colors">
+                                            就決定是你了
+                                        </button>
+                                    </div>
+                                ))}
+                            </div>
+                        </div>
+                    </div>
+                );
+            }
+
+            // 主要遊戲畫面
+            return (
+                <div className="h-screen w-screen flex flex-col pt-1">
+                    {/* Header: 固定高度 */}
+                    <header className="glass-panel mx-4 mb-4 rounded-xl px-6 py-3 flex justify-between items-center shrink-0 z-50 shadow-lg">
+                        <div>
+                            <h1 className="text-xl font-bold tracking-wider text-white">
+                                TAIWAN <span className="text-blue-400">POLITICAL MACHINE</span>
+                            </h1>
+                            <p className="text-xs text-slate-400 font-mono mt-1">
+                                第 {turn} 週 | 
+                                <span className={`ml-2 font-bold ${playerParty.highlight}`}>【代表{playerParty.name}】</span>
+                            </p>
+                        </div>
+                        <div className="flex gap-8 font-mono">
+                            <div className="flex flex-col items-end">
+                                <span className={`text-xs ${playerParty.highlight} opacity-80`}>您的競選資金</span>
+                                <span className="text-green-400 text-lg font-bold">${funds.toLocaleString()}</span>
+                            </div>
+                            <div className="flex flex-col items-end">
+                                <span className={`text-xs ${playerParty.highlight} opacity-80`}>行動點數 (AP)</span>
+                                <div className="flex gap-1 mt-1">
+                                    {[1,2,3].map(i => (
+                                        <div key={i} className={`w-3 h-3 rounded-full ${i <= ap ? 'bg-yellow-400 shadow-[0_0_8px_rgba(250,204,21,0.8)]' : 'bg-slate-700'}`}></div>
+                                    ))}
+                                </div>
+                            </div>
+                        </div>
+                    </header>
+
+                    {/* Main Content: 彈性填滿剩餘高度，不滾動 */}
+                    <main className="flex-1 min-h-0 flex gap-4 px-4 pb-4">
+                        
+                        {/* 左側面板 - 預測與回合 */}
+                        <div className="w-80 glass-panel rounded-xl flex flex-col p-5 shrink-0 overflow-y-auto">
+                            <h2 className="text-lg font-bold mb-4 border-b border-white/10 pb-2 flex justify-between items-end">
+                                <span>全國選情預測</span>
+                                <span className="text-xs text-slate-400 font-normal">落後中</span>
+                            </h2>
+                            <div className="space-y-5 flex-1">
+                                {/* 根據黨派動態改變標籤 */}
+                                {PARTIES.map((party) => {
+                                    // 這裡是 Mock 數據邏輯，之後可接入動態計算
+                                    let percentage = 33.3;
+                                    let votes = 450;
+                                    if(party.id === 'GREEN') { percentage = 38.5; votes = 520; }
+                                    if(party.id === 'BLUE') { percentage = 35.2; votes = 480; }
+                                    if(party.id === 'WHITE') { percentage = 26.3; votes = 350; }
+                                    
+                                    const isMe = party.id === playerParty.id;
+
+                                    return (
+                                        <div key={party.id} className={isMe ? 'p-2 bg-white/5 rounded-lg border border-white/10' : 'p-2'}>
+                                            <div className="flex justify-between text-xs mb-1">
+                                                <span className={`${party.highlight} font-bold flex items-center gap-1`}>
+                                                    {isMe && <span>⭐</span>}
+                                                    {party.name}候選人 {isMe ? "(您)" : ""}
+                                                </span>
+                                                <span>{percentage}% ({votes}萬票)</span>
+                                            </div>
+                                            <div className="w-full bg-slate-800 rounded-full h-1.5 overflow-hidden">
+                                                <div className={`h-full ${party.hex}`} style={{width: `${percentage}%`}}></div>
+                                            </div>
+                                        </div>
+                                    );
+                                })}
+                            </div>
+
+                            <button 
+                                onClick={() => { setTurn(t => t + 1); setAp(3); setFunds(f => f + 500000); }}
+                                className="mt-4 w-full py-3 bg-indigo-600/80 hover:bg-indigo-500 border border-indigo-400/50 text-white font-bold tracking-widest rounded-lg transition-all shadow-[0_0_15px_rgba(79,70,229,0.3)] hover:shadow-[0_0_20px_rgba(79,70,229,0.5)]"
+                            >
+                                結束本週
+                            </button>
+                        </div>
+
+                        {/* 中間地圖 - 自適應空間 */}
+                        <div className="flex-1 glass-panel rounded-xl relative flex items-center justify-center overflow-hidden">
+                            {!geoData ? (
+                                <div className="animate-pulse text-slate-400 flex flex-col items-center">
+                                    <div className="w-8 h-8 border-4 border-indigo-500 border-t-transparent rounded-full animate-spin mb-4"></div>
+                                    載入真實地理資料中...
+                                </div>
+                            ) : (
+                                <svg 
+                                    className="w-full h-full"
+                                    viewBox={`0 0 ${svgWidth} ${svgHeight}`}
+                                    preserveAspectRatio="xMidYMid meet"
+                                >
+                                    <defs>
+                                        <filter id="glow">
+                                            <feGaussianBlur stdDeviation="3.5" result="coloredBlur"/>
+                                            <feMerge>
+                                                <feMergeNode in="coloredBlur"/>
+                                                <feMergeNode in="SourceGraphic"/>
+                                            </feMerge>
+                                        </filter>
+                                    </defs>
+                                    <g>
+                                        {geoData.features.map((feature, i) => {
+                                            const id = feature.properties.COUNTYCODE || feature.properties.COUNTYNAME;
+                                            const isSelected = selectedRegionId === id;
+                                            const regionData = getRegionData(feature);
+                                            
+                                            // Mock: Highlight player regions differently if they have majority? 
+                                            // Currently just showing default mapping
+
+                                            return (
+                                                <path
+                                                    key={i}
+                                                    d={pathGenerator(feature)}
+                                                    className={`county-path ${isSelected ? 'selected' : ''}`}
+                                                    fill={regionData.defaultColor ? regionData.defaultColor : 'rgba(255,255,255,0.1)'}
+                                                    style={{ 
+                                                        fillOpacity: isSelected ? 1 : 0.65
+                                                    }}
+                                                    onClick={() => handleRegionClick(feature)}
+                                                >
+                                                    <title>{regionData.name}</title>
+                                                </path>
+                                            )
+                                        })}
+                                    </g>
+                                </svg>
+                            )}
+                            <div className="absolute bottom-4 left-4 text-xs text-slate-500 pointer-events-none">
+                                點擊地圖選擇縣市
+                            </div>
+                        </div>
+
+                        {/* 右側面板 - 行動指令 */}
+                        <div className="w-80 glass-panel rounded-xl flex flex-col shrink-0 p-0 overflow-hidden">
+                            {selectedRegionData ? (
+                                <div className="flex flex-col h-full animate-[fadeIn_0.3s_ease-out]">
+                                    {/* 頂部名稱區塊 */}
+                                    <div 
+                                        className="p-6 pb-8 text-center relative overflow-hidden"
+                                        style={{ backgroundColor: `${selectedRegionData.defaultColor}44` }}
+                                    >
+                                        <div className="absolute inset-0 bg-gradient-to-b from-transparent to-[#0f172a] opacity-90 z-0"></div>
+                                        <h2 className="text-3xl font-bold mb-1 relative z-10 tracking-widest drop-shadow-md">{selectedRegionData.name}</h2>
+                                        <p className="text-xs text-slate-300 relative z-10 font-mono flex items-center justify-center gap-1">
+                                            <span>👥</span> 選舉人: {(selectedRegionData.votes / 10000).toFixed(0)} 萬
+                                        </p>
+                                    </div>
+                                    
+                                    <div className="p-5 flex-1 overflow-y-auto">
+                                        
+                                        {/* Mock Data */}
+                                        <div className="space-y-2 mb-6">
+                                            <div className="px-3 py-2 bg-slate-800/50 rounded flex justify-between items-center text-xs border-l-2 border-blue-600">
+                                                <span className="text-blue-400">藍營支持度</span><span className="font-mono">45.0%</span>
+                                            </div>
+                                            <div className="px-3 py-2 bg-slate-800/50 rounded flex justify-between items-center text-xs border-l-2 border-green-600">
+                                                <span className="text-green-400">綠營支持度</span><span className="font-mono">35.0%</span>
+                                            </div>
+                                            <div className="px-3 py-2 bg-slate-800/50 rounded flex justify-between items-center text-xs border-l-2 border-teal-500">
+                                                <span className="text-teal-400">白營支持度</span><span className="font-mono">20.0%</span>
+                                            </div>
+                                        </div>
+
+                                        <h3 className="font-bold text-xs text-slate-500 uppercase tracking-widest mb-3 border-b border-white/5 pb-1">您的戰略行動</h3>
+                                        <div className="space-y-3">
+                                            <button 
+                                                onClick={handleRallyClick}
+                                                className="w-full p-4 bg-slate-800/80 hover:bg-slate-700 border border-white/10 hover:border-yellow-400/50 rounded-lg text-left transition-all flex justify-between items-center group relative overflow-hidden"
+                                            >
+                                                <div className="absolute left-0 top-0 bottom-0 w-1 bg-yellow-400 opacity-0 group-hover:opacity-100 transition-opacity"></div>
+                                                <div className="pl-2">
+                                                    <div className="font-bold text-white group-hover:text-yellow-300 transition-colors">🏟️ 舉辦萬人造勢</div>
+                                                    <div className="text-[10px] text-slate-400 mt-1">提升當區 5% 支持度，擴大氣勢</div>
+                                                </div>
+                                                <div className="text-right font-mono ml-2 shrink-0">
+                                                    <div className="text-yellow-400 text-xs font-bold">-1 AP</div>
+                                                    <div className="text-red-400 text-xs">-$1M</div>
+                                                </div>
+                                            </button>
+                                            
+                                            <button className="w-full p-3 bg-slate-800/40 border border-white/5 rounded-lg text-left flex justify-between items-center hover:bg-slate-700/50 transition-colors">
+                                                <div className="pl-2">
+                                                    <div className="font-bold text-slate-300 text-sm">📺 投放廣告</div>
+                                                </div>
+                                                <div className="text-right font-mono">
+                                                    <div className="text-yellow-500/80 text-[10px]">-1 AP</div>
+                                                    <div className="text-red-400/80 text-[10px]">-$500k</div>
+                                                </div>
+                                            </button>
+
+                                            <button className="w-full p-3 bg-slate-800/40 border border-white/5 rounded-lg text-left flex justify-between items-center hover:bg-slate-700/50 transition-colors">
+                                                <div className="pl-2">
+                                                    <div className="font-bold text-slate-300 text-sm">🏛️ 成立競選總部</div>
+                                                </div>
+                                                <div className="text-right font-mono">
+                                                    <div className="text-yellow-500/80 text-[10px]">-2 AP</div>
+                                                    <div className="text-red-400/80 text-[10px]">-$3M</div>
+                                                </div>
+                                            </button>
+                                        </div>
+                                    </div>
+                                </div>
+                            ) : (
+                                <div className="h-full flex flex-col items-center justify-center text-slate-500/50 text-center p-6 bg-slate-800/20">
+                                    <svg className="w-20 h-20 mb-6 opacity-30" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="1" d="M9 20l-5.447-2.724A1 1 0 013 16.382V5.618a1 1 0 011.447-.894L9 7m0 13l6-3m-6 3V7m6 10l4.553 2.276A1 1 0 0021 18.382V7.618a1 1 0 00-.553-.894L15 4m0 13V4m0 0L9 7" />
+                                    </svg>
+                                    <p className="text-sm tracking-widest text-slate-400">目前等待戰略指令</p>
+                                    <p className="text-xs mt-2 font-mono">請先於戰場圖點選目標縣市</p>
+                                </div>
+                            )}
+                        </div>
+                    </main>
+                </div>
+            );
+        }
+
+        const root = ReactDOM.createRoot(document.getElementById("root"));
+        root.render(<App />);
+
+        // 加入簡單的淡入動畫
+        const style = document.createElement('style');
+        style.textContent = `
+            @keyframes fadeIn {
+                from { opacity: 0; transform: translateY(10px); }
+                to { opacity: 1; transform: translateY(0); }
+            }
+        `;
+        document.head.appendChild(style);
+    </script>
+</body>
+</html>
